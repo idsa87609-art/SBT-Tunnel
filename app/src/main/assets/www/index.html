@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>SBT Tunnel</title>
+<style>
+  :root{
+    --ink:#0B1F26;
+    --teal:#1C5866;
+    --signal:#2FB6A3;
+    --amber:#E8B33D;
+    --paper:#EAF3F1;
+    --muted:#8FA6A2;
+    --muted2:#7C948F;
+    --border:#E7EFEC;
+    --err-bg:#FDEDED;
+    --err:#B3261E;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--paper);font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:var(--ink);}
+  #app{max-width:480px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:76px;}
+
+  .screen{display:none;padding:28px 20px 40px;}
+  .screen.active{display:block;}
+
+  /* HOME */
+  .home-header{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:28px;}
+  .home-header h1{font-size:22px;font-weight:700;margin:0;}
+  .power-wrap{display:flex;justify-content:center;}
+  .power-btn{
+    width:210px;height:210px;border-radius:50%;border:none;
+    background:#E4EEEC; display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 24px -8px rgba(0,0,0,.15);
+    transition:all .25s ease; cursor:pointer;
+  }
+  .power-btn.connected{
+    background:radial-gradient(circle at 50% 40%, var(--signal), var(--teal));
+    box-shadow:0 0 0 10px rgba(47,182,163,.13), 0 12px 40px -8px rgba(47,182,163,.5);
+  }
+  .power-btn svg{stroke:#B8C6C3;}
+  .power-btn.connected svg{stroke:#fff;}
+  .status-label{text-align:center;margin-top:16px;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .status-label.connected{color:var(--signal);}
+
+  .card{background:#fff;border-radius:18px;padding:20px;margin-top:24px;box-shadow:0 4px 20px -8px rgba(11,31,38,.13);}
+  .card-row{display:flex;align-items:center;justify-content:space-between;}
+  .card-row .chev{color:var(--teal);transform:rotate(180deg);}
+  .card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:right;}
+  .card-value{font-size:16px;font-weight:600;margin-top:2px;text-align:right;color:var(--muted);}
+  .card-value.set{color:var(--ink);}
+  .card-url{font-size:11px;font-family:monospace;color:var(--muted2);text-align:right;margin-top:6px;direction:ltr;}
+  .divider{height:1px;background:#EDF2F1;margin:16px 0;}
+  .resp-label{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--signal);text-align:right;margin-bottom:6px;}
+  .resp-box{font-size:12px;font-family:monospace;background:#F4F9F8;border-radius:10px;padding:10px;direction:ltr;text-align:left;white-space:pre-wrap;word-break:break-all;color:var(--ink);}
+  .resp-box.error{background:var(--err-bg);color:var(--err);}
+  .resp-empty{font-size:13px;color:#B8C6C3;text-align:right;}
+
+  /* CONFIGS */
+  h2{font-size:20px;font-weight:700;margin:0 0 4px;}
+  .sub{font-size:13px;color:#5E7772;margin:0 0 18px;}
+  .fname-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .fname-row span{font-size:12px;font-weight:600;color:var(--muted2);white-space:nowrap;}
+  .fname-row input{flex:1;font-size:12px;font-family:monospace;border:1px solid #D7E4E1;border-radius:8px;padding:6px 8px;direction:ltr;}
+  textarea{width:100%;height:130px;border-radius:14px;padding:12px;font-size:13px;border:1px solid #D7E4E1;background:#fff;resize:none;font-family:monospace;direction:ltr;outline:none;}
+  .error-box{margin-top:8px;font-size:13px;font-weight:500;padding:10px 12px;border-radius:10px;background:var(--err-bg);color:var(--err);}
+  .btn-row{display:flex;gap:8px;margin-top:12px;}
+  .btn{border:none;border-radius:14px;padding:11px;font-weight:700;font-size:13px;cursor:pointer;}
+  .btn-primary{flex:1;background:var(--signal);color:#fff;}
+  .btn-outline{background:#fff;color:var(--teal);border:1.5px solid var(--teal);display:flex;align-items:center;gap:6px;padding:0 16px;}
+  .cfg-list{margin-top:22px;display:flex;flex-direction:column;gap:12px;}
+  .cfg-empty{text-align:center;font-size:13px;color:#9FB4B0;padding:40px 0;}
+  .cfg-item{background:#fff;border-radius:16px;padding:14px;border:1px solid var(--border);}
+  .cfg-item.active{border-color:var(--signal);box-shadow:0 0 0 2px rgba(47,182,163,.2);}
+  .cfg-top{display:flex;align-items:flex-start;justify-content:space-between;}
+  .cfg-name{font-weight:700;font-size:14px;}
+  .cfg-url{font-size:11px;font-family:monospace;color:var(--muted2);margin-top:3px;direction:ltr;}
+  .cfg-file{font-size:11px;color:var(--muted2);margin-top:2px;}
+  .badge-active{font-size:10px;font-weight:700;padding:4px 8px;border-radius:20px;background:rgba(47,182,163,.13);color:var(--teal);white-space:nowrap;}
+  .cfg-actions{display:flex;gap:8px;margin-top:10px;}
+  .cfg-actions button{border:none;border-radius:10px;font-size:11px;font-weight:700;padding:7px 10px;cursor:pointer;}
+  .act-toggle{flex:1;background:var(--ink);color:#fff;}
+  .act-toggle[disabled]{background:#EDF2F1;color:#9FB4B0;}
+  .act-copy{background:#EDF2F1;color:var(--teal);}
+  .act-del{background:var(--err-bg);color:var(--err);}
+
+  /* LOGS */
+  .logs-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  .btn-clear{border:none;border-radius:10px;font-size:11px;font-weight:700;padding:7px 12px;background:var(--err-bg);color:var(--err);cursor:pointer;}
+  .log-wrap{border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+  .log-empty{text-align:center;font-size:13px;color:#9FB4B0;padding:40px 0;}
+  .log-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid #F1F5F4;}
+  .log-row:last-child{border-bottom:none;}
+  .log-time{font-size:10px;font-family:monospace;color:#9FB4B0;margin-top:1px;white-space:nowrap;}
+  .log-level{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;white-space:nowrap;}
+  .log-text{font-size:13px;flex:1;}
+  .lv-info{background:rgba(28,88,102,.1);color:#1C5866;}
+  .lv-success{background:rgba(31,157,124,.1);color:#1F9D7C;}
+  .lv-warn{background:rgba(185,138,30,.1);color:#B98A1E;}
+  .lv-error{background:rgba(179,38,30,.1);color:#B3261E;}
+
+  /* NAV */
+  .bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:var(--ink);display:flex;justify-content:space-around;align-items:center;padding:8px 0;border-top:1px solid rgba(255,255,255,.08);}
+  .nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:6px 18px;border-radius:12px;cursor:pointer;color:#9FC9C2;}
+  .nav-btn.active{background:var(--amber);color:var(--ink);}
+  .nav-btn span{font-size:11px;font-weight:600;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <div class="screen active" id="screen-home">
+    <div class="home-header">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2FB6A3" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/></svg>
+      <h1>SBT Tunnel</h1>
+    </div>
+
+    <div class="power-wrap">
+      <button class="power-btn" id="powerBtn" onclick="toggleConnect()">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+      </button>
+    </div>
+    <div class="status-label" id="statusLabel">NOT CONNECTED</div>
+
+    <div class="card">
+      <div class="card-row">
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+        <div>
+          <div class="card-label">Active Configuration</div>
+          <div class="card-value" id="activeConfigName">Not Set</div>
+        </div>
+      </div>
+      <div class="card-url" id="activeConfigUrl"></div>
+      <div class="divider"></div>
+      <div class="resp-label">آخر استجابة من السيرفر</div>
+      <div id="respArea"><div class="resp-empty">—</div></div>
+    </div>
+  </div>
+
+  <!-- CONFIGS -->
+  <div class="screen" id="screen-configs">
+    <h2>Configs (.sbt)</h2>
+    <p class="sub">الصق محتوى ملف .sbt (JSON) أو ارفع ملف بامتداد .sbt.</p>
+
+    <div class="fname-row">
+      <span>اسم الملف:</span>
+      <input id="filenameInput" value="manual.sbt" />
+    </div>
+    <textarea id="rawInput">{
+  "name": "My Server",
+  "host": "example.com",
+  "port": 8080,
+  "token": ""
+}</textarea>
+    <div id="errorBox"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="readFromText()">قراءة عبر المحرك</button>
+      <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 21h14"/></svg>
+        ملف .sbt
+      </button>
+      <input type="file" id="fileInput" accept=".sbt" style="display:none" onchange="readFromFile(event)" />
+    </div>
+
+    <div class="cfg-list" id="cfgList"></div>
+  </div>
+
+  <!-- LOGS -->
+  <div class="screen" id="screen-logs">
+    <div class="logs-header">
+      <h2 style="margin:0;">Logs</h2>
+      <button class="btn-clear" onclick="clearLogs()">مسح السجل</button>
+    </div>
+    <div class="log-wrap" id="logWrap"></div>
+  </div>
+
+  <!-- NAV -->
+  <div class="bottom-nav">
+    <button class="nav-btn" id="nav-logs" onclick="showScreen('logs')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
+      <span>Logs</span>
+    </button>
+    <button class="nav-btn" id="nav-configs" onclick="showScreen('configs')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/></svg>
+      <span>Configs</span>
+    </button>
+    <button class="nav-btn active" id="nav-home" onclick="showScreen('home')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+      <span>Home</span>
+    </button>
+  </div>
+
+</div>
+
+<script>
+// ---------- State ----------
+let configs = [];
+let activeId = null;
+let connected = false;
+let logs = [];
+let logIdCounter = 1;
+let pollTimer = null;
+
+// ---------- Utils ----------
+function nowStamp(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+function log(level, text){
+  logs.push({id:logIdCounter++, time: nowStamp(), level, text});
+  renderLogs();
+}
+
+function clearLogs(){
+  logs = [];
+  renderLogs();
+}
+
+// ---------- .sbt Engine ----------
+const SBT_ENGINE = {
+  validate(obj){
+    const errors = [];
+    if(!obj || typeof obj !== 'object') errors.push('المحتوى ليس كائن JSON صالح.');
+    if(!obj?.name || typeof obj.name !== 'string') errors.push('حقل "name" مفقود أو غير نصّي.');
+    if(!obj?.host || typeof obj.host !== 'string') errors.push('حقل "host" مفقود أو غير نصّي.');
+    if(obj?.port === undefined || obj?.port === null || isNaN(Number(obj.port))) errors.push('حقل "port" مفقود أو غير رقمي.');
+    return errors;
+  },
+  parse(raw, filename){
+    if(filename && !filename.toLowerCase().endsWith('.sbt')){
+      throw new Error(`امتداد الملف يجب أن يكون .sbt (استلمت: ${filename})`);
+    }
+    let obj;
+    try { obj = JSON.parse(raw); } catch(e){ throw new Error('محتوى الملف ليس JSON صالح.'); }
+    const errors = this.validate(obj);
+    if(errors.length) throw new Error(errors.join(' · '));
+    return { name: obj.name, host: obj.host, port: Number(obj.port), token: obj.token || null, raw };
+  },
+  buildBaseUrl(cfg){
+    const scheme = cfg.port === 443 ? 'https' : 'http';
+    return `${scheme}://${cfg.host}:${cfg.port}`;
+  }
+};
+
+// ---------- Screens ----------
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-'+name).classList.add('active');
+}
+
+// ---------- Configs ----------
+function addConfig(raw, filename, sourceLabel){
+  const errorBox = document.getElementById('errorBox');
+  try{
+    const parsed = SBT_ENGINE.parse(raw, filename);
+    const entry = { id: Date.now(), ...parsed, filename };
+    configs.unshift(entry);
+    activeId = entry.id;
+    errorBox.innerHTML = '';
+    log('success', `تمت قراءة "${entry.name}" من ${sourceLabel} (${SBT_ENGINE.buildBaseUrl(entry)})`);
+    renderConfigs();
+    renderHome();
+  }catch(e){
+    errorBox.innerHTML = `<div class="error-box">${e.message}</div>`;
+    log('error', `فشل تحليل ${sourceLabel}: ${e.message}`);
+  }
+}
+
+function readFromText(){
+  const raw = document.getElementById('rawInput').value;
+  const filename = document.getElementById('filenameInput').value;
+  addConfig(raw, filename, 'الحقل النصي');
+}
+
+function readFromFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => addConfig(String(reader.result||''), file.name, `ملف "${file.name}"`);
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+
+function setActive(id){
+  activeId = id;
+  const cfg = configs.find(c=>c.id===id);
+  log('info', `تم تعيين "${cfg.name}" كإعداد نشط.`);
+  renderConfigs();
+  renderHome();
+}
+
+function removeConfig(id){
+  const cfg = configs.find(c=>c.id===id);
+  configs = configs.filter(c=>c.id!==id);
+  if(activeId===id){ activeId=null; stopPolling(); }
+  log('warn', `تم حذف "${cfg?.name}".`);
+  renderConfigs();
+  renderHome();
+}
+
+function copyConfig(id){
+  const cfg = configs.find(c=>c.id===id);
+  if(navigator.clipboard) navigator.clipboard.writeText(cfg.raw).catch(()=>{});
+}
+
+function renderConfigs(){
+  const list = document.getElementById('cfgList');
+  if(configs.length===0){
+    list.innerHTML = '<div class="cfg-empty">لا يوجد أي Config بعد.</div>';
+    return;
+  }
+  list.innerHTML = configs.map(cfg=>{
+    const active = cfg.id===activeId;
+    return `
+    <div class="cfg-item ${active?'active':''}">
+      <div class="cfg-top">
+        <div>
+          <div class="cfg-name">${escapeHtml(cfg.name)}</div>
+          <div class="cfg-url">${escapeHtml(SBT_ENGINE.buildBaseUrl(cfg))}</div>
+          <div class="cfg-file">ملف: ${escapeHtml(cfg.filename)}</div>
+        </div>
+        ${active?'<span class="badge-active">ACTIVE</span>':''}
+      </div>
+      <div class="cfg-actions">
+        <button class="act-toggle" ${active?'disabled':''} onclick="setActive(${cfg.id})">${active?'مُفعّل':'تفعيل'}</button>
+        <button class="act-copy" onclick="copyConfig(${cfg.id})">نسخ</button>
+        <button class="act-del" onclick="removeConfig(${cfg.id})">حذف</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- Home / Connection ----------
+function getActiveConfig(){
+  return configs.find(c=>c.id===activeId) || null;
+}
+
+function toggleConnect(){
+  const cfg = getActiveConfig();
+  if(!cfg){
+    log('warn', 'لا يوجد Config نشط. أضف واحدًا من تبويب Configs أولًا.');
+    return;
+  }
+  connected = !connected;
+  if(connected){
+    log('info', `بدء الاستطلاع (polling) على ${SBT_ENGINE.buildBaseUrl(cfg)}`);
+    startPolling(cfg);
+  } else {
+    log('info', 'تم إيقاف الاتصال بالسيرفر.');
+    stopPolling();
+  }
+  renderHome();
+}
+
+function startPolling(cfg){
+  stopPolling();
+  const baseUrl = SBT_ENGINE.buildBaseUrl(cfg);
+  const poll = async () => {
+    try{
+      const headers = {};
+      if(cfg.token) headers['Authorization'] = `Bearer ${cfg.token}`;
+      const res = await fetch(`${baseUrl}/status`, { headers });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      let data;
+      try { data = await res.json(); } catch(e){ data = await res.text(); }
+      renderResponse(data, null);
+    }catch(e){
+      renderResponse(null, e.message || 'فشل الاتصال بالسيرفر.');
+      log('error', `فشل استطلاع ${baseUrl}/status: ${e.message}`);
+    }
+  };
+  poll();
+  pollTimer = setInterval(poll, 1000);
+}
+
+function stopPolling(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+  document.getElementById('respArea').innerHTML = '<div class="resp-empty">—</div>';
+}
+
+function renderResponse(data, error){
+  const area = document.getElementById('respArea');
+  if(error){
+    area.innerHTML = `<div class="resp-box error">${escapeHtml(error)}</div>`;
+  } else {
+    const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    area.innerHTML = `<pre class="resp-box">${escapeHtml(text)}</pre>`;
+  }
+}
+
+function renderHome(){
+  const cfg = getActiveConfig();
+  const btn = document.getElementById('powerBtn');
+  const label = document.getElementById('statusLabel');
+  const nameEl = document.getElementById('activeConfigName');
+  const urlEl = document.getElementById('activeConfigUrl');
+
+  btn.classList.toggle('connected', connected);
+  label.classList.toggle('connected', connected);
+  label.textContent = connected ? 'CONNECTED · POLLING' : 'NOT CONNECTED';
+
+  if(cfg){
+    nameEl.textContent = cfg.name;
+    nameEl.classList.add('set');
+    urlEl.textContent = SBT_ENGINE.buildBaseUrl(cfg);
+  } else {
+    nameEl.textContent = 'Not Set';
+    nameEl.classList.remove('set');
+    urlEl.textContent = '';
+  }
+}
+
+// ---------- Logs ----------
+const LEVEL_CLASS = { info:'lv-info', success:'lv-success', warn:'lv-warn', error:'lv-error' };
+const LEVEL_LABEL = { info:'INFO', success:'OK', warn:'WARN', error:'ERR' };
+
+function renderLogs(){
+  const wrap = document.getElementById('logWrap');
+  if(logs.length===0){
+    wrap.innerHTML = '<div class="log-empty">لا يوجد أحداث مسجّلة.</div>';
+    return;
+  }
+  wrap.innerHTML = [...logs].reverse().map(l=>`
+    <div class="log-row">
+      <span class="log-time">${l.time}</span>
+      <span class="log-level ${LEVEL_CLASS[l.level]}">${LEVEL_LABEL[l.level]}</span>
+      <span class="log-text">${escapeHtml(l.text)}</span>
+    </div>
+  `).join('');
+}
+
+// ---------- Init ----------
+log('info', 'المحرك جاهز.');
+renderConfigs();
+renderHome();
+renderLogs();
+</script>
+</body>
+</html>
